@@ -1,0 +1,38 @@
+{
+  "name": "dsh-model-filter",
+  "version": "0.1.0",
+  "description": "从 DSH Web 的模型选择器目录里隐藏指定 provider 的指定模型（例如隐藏账号路由 deepseek-account 下的 deepseek-v4-pro），provider 路由本身完全不动。",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "PROOF.md"
+  ],
+  "scripts": {
+    "check": "node --check lib/index.js",
+    "test": "node experiments/prototype-patch.mjs && node experiments/plugin-e2e.mjs"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "model-filter",
+    "model-selection",
+    "deepseek-account"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

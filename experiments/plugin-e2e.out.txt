@@ -1,0 +1,58 @@
+
+=== E0 反证：账号路由本身没有「隐藏某个模型」的开关 ===
+账号路由 Config 里有 modelOverrides 吗: true
+modelOverrides.<modelId> 允许写的字段: ["name","description","contextWindow","maxTokens","imagePixelBudget","imageMaxBytes","systemPromptUpdate","toolUpdate","inputModalities"]
+该字段表里有 hidden/disabled/enabled 吗: false
+试着写 modelOverrides: { "deepseek-v4-pro": { hidden: true } }，schema 解析结果是: {} ← 未知字段被丢弃，写不进去
+账号路由还说 models 字段已不可配置: true
+结论：modelOverrides 只能改名字/描述/上下文/输出上限/模态，没有隐藏位 → 必须在目录这一层另找缝隙
+
+=== E1 基线（未挂插件） ===
+catalog: {"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+modelAvailable(deepseek-account/deepseek-v4-pro): true
+
+=== E2 用真 Cordis 生命周期挂插件（ctx.plugin + await + fork.dispose） ===
+info: [dsh-model-filter] 已挂载：隐藏 deepseek-account → deepseek-v4-pro
+catalog: {"groups":[{"id":"deepseek-account","models":["deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+modelAvailable(deepseek-account/deepseek-v4-pro): false
+modelAvailable(deepseek-account/deepseek-v4): true
+实例被加了自有 listModels 吗（应 false）: false
+另一个 ctx 消费者（子 context）也看不到 v4-pro ? true
+
+=== E3 再挂一层（不同 config）+ 只卸载一层：验证共享 wrapper 不叠加 ===
+info: [dsh-model-filter] 已挂载：隐藏 deepseek-api-key → deepseek-v4-pro
+两层同时在位 catalog: {"groups":[{"id":"deepseek-account","models":["deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+卸载第一层后 catalog（account 的 v4-pro 应回来，api-key 的仍被隐藏）: {"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+wrapper 还是同一层吗（应 true，没叠加）: true
+全部卸载后 catalog: {"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+原型已还原成原生方法吗: true
+原型上的补丁状态已清掉吗: true
+
+=== E4 异常降级：坏配置 / 坏目录 / 上游抛错 ===
+warn: [dsh-model-filter] hideModels 无法枚举，插件不生效：Error: 配置对象坏了
+info: [dsh-model-filter] 未配置 hideModels，插件不生效（目录保持原样）
+坏配置下 catalog（应与基线一致）: {"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+- config 为 null: 日志=info: 未配置 hideModels，插件不生效（目录保持原样） catalog={"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+- hideModels 是数组: 日志=warn: hideModels 必须是 { "<providerId>": ["<modelId>", ...] } 形式的对象 | info: 未配置 hideModels，插件不生效（目录保持原样） catalog={"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+- hideModels 值为空数组: 日志=warn: hideModels["deepseek-account"] 是空列表，已忽略该 provider | info: 未配置 hideModels，插件不生效（目录保持原样） catalog={"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+- hideModels 值非数组: 日志=warn: hideModels["deepseek-account"] 必须是字符串数组，已忽略该 provider | info: 未配置 hideModels，插件不生效（目录保持原样） catalog={"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+- 配置了不存在的 provider（应完全透传）: 日志=info: 已挂载：隐藏 no-such-provider → x catalog={"groups":[{"id":"deepseek-account","models":["deepseek-v4-pro","deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+上游抛错的 provider 仍如实出现在 failures 里（插件不吞错）: {"groups":[{"id":"deepseek-account","models":["deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+基线（未挂插件）weird-provider 模型数: 2
+info: [dsh-model-filter] 已挂载：隐藏 weird-provider → weird-a；deepseek-account → deepseek-v4-pro
+warn: [dsh-model-filter] 过滤出错，已退回原目录：Error: 目录数组的 filter 坏了
+过滤内部抛错时 listModels 仍正常返回: true
+该 provider 退回原行为（模型没被隐藏）: true
+catalog 里 weird-provider 仍有两项、没被打崩: ["weird-a","weird-b"]
+同一次挂载里另一个 provider 的过滤照常生效: true
+
+=== E5 HMR 语义：同一个原型上重复挂载同一插件模块 ===
+info: [dsh-model-filter] 已挂载：隐藏 deepseek-account → deepseek-v4-pro
+info: [dsh-model-filter] 已挂载：隐藏 deepseek-account → deepseek-v4-pro
+两次挂载后原型方法还是同一层 wrapper（没叠加）: true
+catalog: {"groups":[{"id":"deepseek-account","models":["deepseek-v4","deepseek-chat"]},{"id":"deepseek-api-key","models":["deepseek-v4-pro","deepseek-v4"]},{"id":"weird-provider","models":["weird-a","weird-b"]}],"failures":["broken-provider"]}
+全部卸载后原型已还原成原生方法: true
+全部卸载后 catalog 与基线一致: false
+
+=== 结论 ===
+插件版本: 0.1.0 | 真插件 + 真 cordis + 真 LlmRuntime + 真 buildModelCatalog 全链路通过
