@@ -1229,7 +1229,7 @@
       - id: tool-plugin-market
         name: '@deepseek-ai/dsh-plugin-market/tools'
         disabled: !!js '!ctx.get(''profileContext'')'
-# == /home/iwinoid/Documents/项目/dsh/dsh-model-filter/.tmp-dsh-home/profiles/filtertest/cordis.patch.yml
+# == ~/Documents/项目/dsh/dsh-model-filter/.tmp-dsh-home/profiles/filtertest/cordis.patch.yml
 - id: dsh-model-filter
   name: dsh-model-filter
   config:
