@@ -1,5 +1,8 @@
 # dsh-model-filter
 
+> [!WARNING]
+> 个人自用项目。仅在我的机器与工作流上验证过，不保证在其他 DSH 版本、平台或环境下可用。请先审阅代码、谨慎使用，风险自负。
+
 在**保留 provider 路由**的前提下，把指定模型从 DSH Web 的模型选择器目录里隐藏。
 
 典型用法：dsh 0.2.1-rc.3 登录 DeepSeek 账号后可免配 API Key 走账号额度（provider id `deepseek-account`）。
